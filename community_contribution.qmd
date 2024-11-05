@@ -1,0 +1,203 @@
+---
+title: "Community Contribution" 
+author: Jason Cheung (jc6405)
+execute:
+  echo: true
+format:
+  html:
+    fig-width: 6
+    fig-height: 4
+    out-width: 60%
+    embed-resources: true
+---
+
+# Background to why `Naniar` Package  
+
+1. How many missing values are there ?
+2. Are there any patterns to these missing data? 
+3. Should we interpolate them as it may contain useful information or just 
+delete them? 
+
+# What is `Naniar` Package? 
+The `Naniar` Package is a library that is primarily used for visualization and 
+to help with missing values in your dataset
+
+Sources that I used: 
+
+1. https://tmb.njtierney.com/explore-missings-big-picture 
+2. https://naniar.njtierney.com/articles/naniar-visualisation.html 
+3. https://cran.r-project.org/web/packages/naniar/vignettes/getting-started-w-
+naniar.html 
+
+# Loading Libraries
+```{r}
+library(ggplot2)
+library(naniar) 
+library(dplyr) 
+library(tidyverse)
+```
+
+# Benefit #1 of `Naniar` Package: 
+Allows you to see missing value in data set in a much cleaner and organize 
+format
+
+```{r} 
+mycars <- mtcars
+mycars[,"gear"] <- NA
+mycars[10:20, 3:5] <- NA
+for (i in 1:10) mycars[sample(32,1), sample(11,1)] <- NA
+```
+
+```{r} 
+head(mycars)
+```
+
+```{r}
+summary(mycars)
+```
+
+```{r} 
+colSums(is.na(mycars)) 
+# colSums(is.na(mycars), decreasing = TRUE)
+```
+
+```{r} 
+rowSums(is.na(mycars))
+```
+
+<br> 
+Issue with above is that it displays result in a numeric class and you cannot 
+order, whereas the functions in `Naniar` package keeps it in a data frame
+
+```{r} 
+# tells you number of missing data in each col
+head(miss_var_summary(mycars))
+```
+
+```{r} 
+# tells you number of missing data in each row 
+head(miss_case_summary(mycars))
+```
+
+```{r}
+# Compatible with dplyr library as it keeps it in a dataframe class
+mycars |> 
+  miss_var_summary() |> 
+  filter(n_miss != 0) |> 
+  head()
+```
+
+```{r}
+mycars |>  
+  group_by(cyl) |>
+  miss_var_summary() |> 
+  filter(n_miss == 0) |> 
+  head()
+```
+
+# Limitation of Benefit #1: Unable to display missing rows and columns
+```{r}
+na_rows <- mycars[rowSums(is.na(mycars)) > 0, ] 
+head(na_rows)
+```
+
+
+# Benefit #2 of `Naniar` Package: 
+Allows you to quickly visualize pattern in missing values in the data set
+
+```{r}
+# Instead of looking at NA Value through data frame, can just plot it instead 
+# Allows us to also see pattern of missing value and if there are cluster of 
+# missing values happening
+vis_miss(mycars)
+```
+
+```{r}
+mycars$am <- 
+  fct_recode(factor(mycars$am),   
+  'Automatic' = '0',  
+  'Manual' = '1') 
+```
+
+
+```{r}
+# Cluster: Orders the graph in a hierarchical order that arranges row order 
+# given missing value
+vis_miss(mycars, cluster = TRUE, facet = am)
+```
+
+# Limitation of Benefit #2: Faceting Label Loss
+Try to get the percentage missing for each column when faceting as by vis_miss 
+default does not include it, which I was able to do below but had no idea how 
+to manually insert these missing percentage into the graph itself though...
+
+```{r}
+test <- mycars |>
+  group_by(am) |>
+  miss_var_summary() 
+
+test |> 
+  select(am, variable, pct_miss) |> 
+  filter(am == 'Manual') |>
+  mutate(variable = factor(variable, levels = colnames(mycars))) |>
+  arrange(variable)
+```
+
+# Few more `Naniar` functions to identify Missing Values Pattern
+```{r}
+gg_miss_var(mycars)
+```
+
+
+```{r}
+gg_miss_case(mycars) 
+```
+
+
+# Benefit #3: `Naniar` Package: 
+
+Typical problem that I face: Now that you know what data are missing, what do 
+we do now? Should we remove it? Should we keep it? Does it provide any value? Is 
+there a pattern corresponded to the NA values? I don't know what to do 
+
+With the `Naniar` package it allows you to work with these NA values where it 
+will interpolate them with values that are 10% of the minimum value. As a 
+result, this allows us to see pattern 
+
+```{r}
+head(mycars)
+```
+
+```{r}
+# ggplot would automatically not include NA values (can be seen in console)
+ggplot(mycars, aes(x = disp, y = mpg)) +
+  geom_point() + 
+  labs(title = "Disp vs mpg") 
+```
+
+```{r}
+# Generates legend to by itself
+ggplot(mycars, aes(x = disp, y = mpg)) +
+  geom_miss_point() + 
+  labs(title = "Disp vs mpg") 
+```
+
+```{r}
+ggplot(mycars, aes(x = disp, y = mpg)) +
+  geom_miss_point() + 
+  facet_wrap(~am) + 
+  labs(title = "Disp vs mpg (Facet over am)") 
+```
+
+# Workaround: 
+```{r}
+mycars |> 
+  mutate(imputed_disp = replace(disp, is.na(disp), mean(disp, na.rm = TRUE)))|> 
+  ggplot(aes(x = imputed_disp, y = mpg)) +
+  geom_point() +  
+  geom_miss_point() +
+  labs(title = "Disp vs mpg") 
+```
+
+
+
